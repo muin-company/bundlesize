@@ -1,0 +1,41 @@
+{
+  "name": "@muin/bundlesize",
+  "version": "1.0.0",
+  "description": "Track and enforce bundle size limits. Keep your builds lean.",
+  "main": "dist/index.js",
+  "bin": {
+    "bundlesize": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muin-company/bundlesize.git"
+  },
+  "keywords": [
+    "bundle",
+    "size",
+    "webpack",
+    "performance",
+    "ci",
+    "build"
+  ],
+  "author": "MUIN",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/muin-company/bundlesize/issues"
+  },
+  "homepage": "https://github.com/muin-company/bundlesize#readme",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
