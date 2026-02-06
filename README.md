@@ -60,6 +60,46 @@ npx bundlesize --json
 npx bundlesize --config custom-config.json
 ```
 
+### Watch mode (development)
+
+Monitor bundle sizes during development:
+
+```bash
+npx bundlesize --watch
+```
+
+**What it does:**
+- Automatically re-checks bundle sizes when files change
+- Shows size differences (±KB) after each change
+- Perfect for optimizing bundles in real-time
+- Press Ctrl+C to stop
+
+**Example output:**
+```bash
+👀 Watching for changes...
+
+Files being watched:
+  - /path/to/dist/main.js
+  - /path/to/dist/vendor.js
+
+Press Ctrl+C to stop
+
+Bundle Size Check Results:
+...
+
+📝 Change detected: main.js
+10:45:32 AM
+
+Bundle Size Check Results:
+...
+
+📊 Size Changes:
+  Raw:  +2.34KB
+  Gzip: +890B
+
+👀 Watching for changes...
+```
+
 ## Examples
 
 ### Example 1: All bundles passing
