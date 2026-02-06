@@ -166,6 +166,314 @@ Instant feedback when something goes wrong.
 3. Compares gzip size against your configured limits
 4. Reports results and exits with appropriate code
 
+## Real-World Examples
+
+### 1. Progressive Bundle Limits
+
+Set increasingly strict limits as code matures:
+
+```json
+{
+  "files": [
+    {
+      "path": "dist/main.*.js",
+      "maxSize": "150KB",
+      "compression": "gzip"
+    },
+    {
+      "path": "dist/vendor.*.js",
+      "maxSize": "200KB",
+      "note": "TODO: reduce to 150KB by Q2"
+    }
+  ]
+}
+```
+
+Update limits gradually:
+
+```bash
+# Month 1: baseline
+"maxSize": "200KB"
+
+# Month 2: -10%
+"maxSize": "180KB"
+
+# Month 3: -20%
+"maxSize": "160KB"
+```
+
+### 2. Per-Environment Configs
+
+Different limits for different builds:
+
+```json
+// .bundlesizerc.production.json
+{
+  "files": [
+    { "path": "dist/*.js", "maxSize": "100KB" }
+  ]
+}
+
+// .bundlesizerc.development.json
+{
+  "files": [
+    { "path": "dist/*.js", "maxSize": "500KB" }
+  ]
+}
+```
+
+```bash
+# In CI
+npx bundlesize --config .bundlesizerc.production.json
+
+# Locally
+npx bundlesize --config .bundlesizerc.development.json
+```
+
+### 3. Size Trend Tracking
+
+Track bundle size over time:
+
+```bash
+# Generate daily reports
+npx bundlesize --json > reports/bundle-$(date +%Y%m%d).json
+
+# Compare with last week
+current=$(npx bundlesize --json | jq '.files[0].size')
+baseline=$(cat reports/bundle-$(date -d '7 days ago' +%Y%m%d).json | jq '.files[0].size')
+diff=$((current - baseline))
+echo "Size change: ${diff}KB"
+```
+
+GitHub Action to track trends:
+
+```yaml
+name: Bundle Size Trend
+
+on: [push]
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build
+        run: npm ci && npm run build
+      
+      - name: Check bundle size
+        run: npx bundlesize --json > bundle-report.json
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle-size-${{ github.sha }}
+          path: bundle-report.json
+      
+      - name: Comment on PR with diff
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('bundle-report.json'));
+            const summary = report.files.map(f => 
+              `${f.path}: ${f.size} (limit: ${f.maxSize})`
+            ).join('\n');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Bundle Size Report\n\`\`\`\n${summary}\n\`\`\``
+            });
+```
+
+### 4. Split Bundles by Route
+
+For SPA applications:
+
+```json
+{
+  "files": [
+    { "path": "dist/main.*.js", "maxSize": "50KB" },
+    { "path": "dist/home.*.js", "maxSize": "30KB" },
+    { "path": "dist/dashboard.*.js", "maxSize": "100KB" },
+    { "path": "dist/admin.*.js", "maxSize": "150KB" },
+    { "path": "dist/vendor.*.js", "maxSize": "200KB" }
+  ]
+}
+```
+
+Ensure critical routes stay fast.
+
+### 5. Automatic Code Splitting Enforcement
+
+Fail build if any single chunk is too large:
+
+```json
+{
+  "files": [
+    {
+      "path": "dist/*.js",
+      "maxSize": "100KB",
+      "note": "No single chunk should exceed 100KB - use code splitting!"
+    }
+  ]
+}
+```
+
+Force developers to split large features:
+
+```javascript
+// Before: 150KB bundle
+import HeavyComponent from './HeavyComponent';
+
+// After: lazy load, ~10KB initial
+const HeavyComponent = React.lazy(() => import('./HeavyComponent'));
+```
+
+### 6. Third-Party Dependency Budgets
+
+Track vendor bundle separately:
+
+```json
+{
+  "files": [
+    { "path": "dist/app.*.js", "maxSize": "100KB" },
+    { "path": "dist/vendor.*.js", "maxSize": "150KB" }
+  ]
+}
+```
+
+Alert when adding heavy dependencies:
+
+```bash
+# Before adding new dependency
+npx bundlesize --json > before.json
+
+# After npm install new-heavy-library
+npm run build
+npx bundlesize --json > after.json
+
+# Calculate diff
+node -e "
+const before = require('./before.json');
+const after = require('./after.json');
+const diff = after.files[1].size - before.files[1].size;
+if (diff > 10000) {
+  console.error(\`Vendor bundle increased by \${diff}KB!\`);
+  process.exit(1);
+}
+"
+```
+
+### 7. Integration with Webpack Bundle Analyzer
+
+Combine bundlesize with analysis:
+
+```json
+{
+  "scripts": {
+    "build": "webpack --mode production",
+    "analyze": "webpack --mode production --analyze",
+    "check:size": "bundlesize",
+    "check:size:analyze": "npm run analyze && bundlesize"
+  }
+}
+```
+
+If bundlesize fails, run analyzer:
+
+```bash
+npx bundlesize || npm run analyze
+```
+
+### 8. Slack/Discord Notifications on Failures
+
+Alert team when bundle size increases:
+
+```yaml
+# .github/workflows/bundle-alert.yml
+name: Bundle Size Alert
+
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: npm ci && npm run build
+      
+      - name: Check bundle size
+        id: bundlesize
+        run: |
+          npx bundlesize --json > report.json
+          echo "passed=$(jq -r '.passed' report.json)" >> $GITHUB_OUTPUT
+      
+      - name: Notify on Slack
+        if: steps.bundlesize.outputs.passed == 'false'
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK }} \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "text": "⚠️ Bundle size limit exceeded in PR #${{ github.event.pull_request.number }}",
+            "blocks": [{
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Bundle Size Alert* 🚨\nPR: <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }}>\nAuthor: @${{ github.event.pull_request.user.login }}"
+              }
+            }]
+          }'
+```
+
+### 9. Performance Budget Dashboard
+
+Visualize bundle size history:
+
+```javascript
+// scripts/bundle-dashboard.js
+const fs = require('fs');
+const reports = fs.readdirSync('reports/')
+  .filter(f => f.startsWith('bundle-'))
+  .map(f => JSON.parse(fs.readFileSync(`reports/${f}`)));
+
+const chart = reports.map((r, i) => ({
+  date: r.timestamp,
+  size: r.files[0].size,
+  limit: r.files[0].maxSize
+}));
+
+// Generate HTML chart with Chart.js
+const html = `<!DOCTYPE html>
+<html>
+<head><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head>
+<body>
+  <canvas id="chart"></canvas>
+  <script>
+    new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: {
+        labels: ${JSON.stringify(chart.map(c => c.date))},
+        datasets: [{
+          label: 'Bundle Size',
+          data: ${JSON.stringify(chart.map(c => c.size))},
+          borderColor: 'rgb(75, 192, 192)'
+        }, {
+          label: 'Limit',
+          data: ${JSON.stringify(chart.map(c => c.limit))},
+          borderColor: 'rgb(255, 99, 132)'
+        }]
+      }
+    });
+  </script>
+</body>
+</html>`;
+
+fs.writeFileSync('bundle-dashboard.html', html);
+```
+
 ## License
 
 MIT
