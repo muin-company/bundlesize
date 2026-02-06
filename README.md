@@ -60,6 +60,111 @@ npx bundlesize --json
 npx bundlesize --config custom-config.json
 ```
 
+## Examples
+
+### Example 1: All bundles passing
+
+```bash
+$ npx bundlesize
+
+Bundle Size Check Results:
+
+File                                     Raw          Gzip         Limit        Status
+---------------------------------------- ------------ ------------ ------------ ------
+dist/main.a1b2c3.js                      87.23KB      34.56KB      100KB        ✓ PASS
+dist/vendor.d4e5f6.js                    156.78KB     52.34KB      200KB        ✓ PASS
+dist/app.css                             12.45KB      4.23KB       20KB         ✓ PASS
+
+✓ All files passed size checks
+```
+
+Exit code: 0
+
+### Example 2: Bundle size violation
+
+```bash
+$ npx bundlesize
+
+Bundle Size Check Results:
+
+File                                     Raw          Gzip         Limit        Status
+---------------------------------------- ------------ ------------ ------------ ------
+dist/main.abc123.js                      245.67KB     105.34KB     100KB        ✗ FAIL (+5.34KB)
+dist/vendor.def456.js                    189.23KB     65.12KB      200KB        ✓ PASS
+dist/styles.css                          18.45KB      7.23KB       20KB         ✓ PASS
+
+✗ 1 file(s) exceeded size limits
+```
+
+Exit code: 1 (fails CI pipeline)
+
+### Example 3: JSON output for CI integration
+
+```bash
+$ npx bundlesize --json
+
+{
+  "pass": false,
+  "files": [
+    {
+      "path": "dist/main.abc123.js",
+      "size": 251566,
+      "gzip": 107867,
+      "limit": 102400,
+      "pass": false,
+      "overBy": 5467
+    },
+    {
+      "path": "dist/vendor.def456.js",
+      "size": 193772,
+      "gzip": 66683,
+      "limit": 204800,
+      "pass": true
+    }
+  ]
+}
+```
+
+Useful for custom CI reports or Slack notifications.
+
+### Example 4: No matching files
+
+```bash
+$ npx bundlesize
+
+Bundle Size Check Results:
+
+Warning: No files matched pattern 'build/*.js'
+
+File                                     Raw          Gzip         Limit        Status
+---------------------------------------- ------------ ------------ ------------ ------
+(no files found)
+
+✗ Check your configuration - some patterns matched no files
+```
+
+Catches misconfigured paths or build failures early.
+
+### Example 5: First-time setup
+
+```bash
+$ npx bundlesize --init
+
+✓ Created .bundlesizerc.json
+
+Default configuration created. Edit the file to set your size limits:
+{
+  "files": [
+    { "path": "dist/**/*.js", "maxSize": "100KB" },
+    { "path": "dist/**/*.css", "maxSize": "20KB" }
+  ]
+}
+
+Run 'npx bundlesize' to check your bundles.
+```
+
+Perfect for adding bundle size checks to existing projects.
+
 ## Configuration
 
 The `.bundlesizerc.json` file accepts an array of file patterns with size limits:
